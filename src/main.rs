@@ -100,10 +100,6 @@ fn main() {
                     None => thread::sleep(time::Duration::from_millis(500)),
                     // Task was started, continue
                     Some(task_status) => {
-                        if task_status.stopped_at != None {
-                            break;
-                        }
-
                         // Check if status has changed
                         if let (Some(ref old), Some(ref new)) =
                             (&task_status.last_status, &previous_status.last_status)
@@ -112,12 +108,27 @@ fn main() {
                                 println!("Status: {}", new);
                             }
                         }
-                        thread::sleep(time::Duration::from_millis(500));
                         previous_status = task_status;
+
+                        if previous_status.stopped_at != None {
+                            break;
+                        }
+
+                        thread::sleep(time::Duration::from_millis(500));
                     }
                 }
             }
-            println!("Task finished, fetching logs");
+
+            let exit_code = previous_status
+                .containers
+                .unwrap()
+                .first()
+                .unwrap()
+                .exit_code
+                .unwrap();
+            println!("Task finished with exit code {}, fetching logs", &exit_code);
+
+            thread::sleep(time::Duration::from_millis(5000));
 
             let log_stream_name =
                 format!("{}/{}/{}", &log_prefix, &container.name.unwrap(), &task_id);
@@ -130,6 +141,8 @@ fn main() {
                     None => (),
                 }
             }
+
+            std::process::exit(exit_code as i32);
         }
         Err(error) => {
             println!("Error: {}", error);
