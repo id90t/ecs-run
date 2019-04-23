@@ -128,6 +128,8 @@ fn main() {
                 .unwrap();
             println!("Task finished with exit code {}, fetching logs", &exit_code);
 
+            thread::sleep(time::Duration::from_millis(5000));
+
             let log_stream_name =
                 format!("{}/{}/{}", &log_prefix, &container.name.unwrap(), &task_id);
             let logs_client = CloudWatchLogsClient::new(Region::from_str(&log_region).unwrap());
