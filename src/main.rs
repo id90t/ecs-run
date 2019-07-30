@@ -1,7 +1,6 @@
 use clap::{App, Arg};
 use rusoto_core::Region;
 use rusoto_ecs::{Ecs, EcsClient};
-use rusoto_logs::{CloudWatchLogs, CloudWatchLogsClient};
 use std::str::FromStr;
 use std::{thread, time};
 
@@ -59,22 +58,6 @@ fn main() {
                 .unwrap();
             let container = get_container(&task_definition, matches.value_of("CONTAINER"));
 
-            let log_options = container
-                .clone()
-                .log_configuration
-                .unwrap()
-                .options
-                .unwrap();
-            let log_group = log_options
-                .get("awslogs-group")
-                .expect("No log group configured");
-            let log_region = log_options
-                .get("awslogs-region")
-                .expect("No log region configured");
-            let log_prefix = log_options
-                .get("awslogs-stream-prefix")
-                .expect("No log stream prefix configured");
-
             let task = run_task(
                 &ecs_client,
                 &cluster.to_string(),
@@ -126,21 +109,7 @@ fn main() {
                 .unwrap()
                 .exit_code
                 .unwrap();
-            println!("Task finished with exit code {}, fetching logs", &exit_code);
-
-            thread::sleep(time::Duration::from_millis(5000));
-
-            let log_stream_name =
-                format!("{}/{}/{}", &log_prefix, &container.name.unwrap(), &task_id);
-            let logs_client = CloudWatchLogsClient::new(Region::from_str(&log_region).unwrap());
-            let logs = fetch_logs(&logs_client, &log_group, &log_stream_name);
-
-            for log in &logs.clone().events.unwrap() {
-                match &log.message {
-                    Some(message) => println!("{}", &message),
-                    None => (),
-                }
-            }
+            println!("Task finished with exit code {}", &exit_code);
 
             std::process::exit(exit_code as i32);
         }
@@ -165,22 +134,6 @@ fn parse_env(
         })
         .collect()
     })
-}
-
-// TODO: loop if there are more logs
-fn fetch_logs(
-    client: &rusoto_logs::CloudWatchLogsClient,
-    log_group_name: &str,
-    log_stream_name: &str,
-) -> rusoto_logs::GetLogEventsResponse {
-    let result = client
-        .get_log_events(rusoto_logs::GetLogEventsRequest {
-            log_group_name: log_group_name.to_string(),
-            log_stream_name: log_stream_name.to_string(),
-            ..Default::default()
-        })
-        .sync();
-    result.unwrap()
 }
 
 fn fetch_task(
